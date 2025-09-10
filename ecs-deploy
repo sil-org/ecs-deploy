@@ -33,7 +33,7 @@ function usage() {
     cat <<EOM
 ##### ecs-deploy #####
 Simple script for triggering blue/green deployments on Amazon Elastic Container Service
-https://github.com/silinternational/ecs-deploy
+https://github.com/sil-org/ecs-deploy
 
 One of the following is required:
     -n | --service-name          Name of service to deploy

@@ -1,6 +1,6 @@
 # ecs-deploy
 
-![Status for silinternational/ecs-deploy](https://github.com/silinternational/ecs-deploy/actions/workflows/ci.yml/badge.svg?branch=master)
+![Status for sil-org/ecs-deploy](https://github.com/sil-org/ecs-deploy/actions/workflows/ci.yml/badge.svg?branch=master)
 
 This script uses the Task Definition and Service entities in Amazon's ECS to instigate an automatic blue/green deployment.
 
@@ -91,7 +91,7 @@ are to add support for new AWS CLI features.
 - Install ecs-deploy:
 
 ```
-curl https://raw.githubusercontent.com/silinternational/ecs-deploy/master/ecs-deploy | sudo tee /usr/bin/ecs-deploy
+curl https://raw.githubusercontent.com/sil-org/ecs-deploy/master/ecs-deploy | sudo tee /usr/bin/ecs-deploy
 sudo chmod +x /usr/bin/ecs-deploy
 
 ```
@@ -274,7 +274,7 @@ deploy_to_ecs:
   name: 'Deploy updated container image via blue/green deployment to ECS service.'
   runs-on: ubuntu-18.04
   steps:
-  - uses: silinternational/ecs-deploy@master
+  - uses: sil-org/ecs-deploy@master
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

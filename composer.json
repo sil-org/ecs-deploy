@@ -1,5 +1,5 @@
 {
-    "name": "silinternational/ecs-deploy",
+    "name": "sil-org/ecs-deploy",
     "description": "Simple shell script for initiated blue-green deployments on Amazon Elastic Container Service (ECS)",
     "type": "library",
     "keywords": [
@@ -10,7 +10,7 @@
         "elastic container service",
         "amazon web services"
     ],
-    "homepage": "https://github.com/silinternational/ecs-deploy",
+    "homepage": "https://github.com/sil-org/ecs-deploy",
     "license": "MIT",
     "bin": [
         "ecs-deploy"
