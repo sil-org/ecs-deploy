@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Setup default values for variables
-VERSION="3.10.23"
+VERSION="3.10.24"
 CLUSTER=false
 SERVICE=false
 TASK_DEFINITION=false
@@ -129,9 +129,13 @@ function assumeRole() {
                     --role-arn "${AWS_ASSUME_ROLE}" \
                     --role-session-name "$(date +"%s")")
 
-   export AWS_ACCESS_KEY_ID=$(echo $temp_role | jq .Credentials.AccessKeyId | xargs)
-   export AWS_SECRET_ACCESS_KEY=$(echo $temp_role | jq .Credentials.SecretAccessKey | xargs)
-   export AWS_SESSION_TOKEN=$(echo $temp_role | jq .Credentials.SessionToken | xargs)
+   AWS_ACCESS_KEY_ID=$(echo "$temp_role" | jq .Credentials.AccessKeyId | xargs)
+   export AWS_ACCESS_KEY_ID
+   AWS_SECRET_ACCESS_KEY=$(echo "$temp_role" | jq .Credentials.SecretAccessKey | xargs)
+   export AWS_SECRET_ACCESS_KEY
+   AWS_SESSION_TOKEN=$(echo "$temp_role" | jq .Credentials.SessionToken | xargs)
+   export AWS_SESSION_TOKEN
+
 }
 
 
@@ -159,43 +163,43 @@ function assertRequiredArgumentsSet() {
               AWS_ECS="$AWS_ECS --profile $AWS_PROFILE"
     fi
 
-    if [ $SERVICE == false ] && [ $TASK_DEFINITION == false ]; then
+    if [ "$SERVICE" == false ] && [ "$TASK_DEFINITION" == false ]; then
         echo "One of SERVICE or TASK DEFINITION is required. You can pass the value using -n / --service-name for a service, or -d / --task-definition for a task"
         exit 5
     fi
-    if [ $SERVICE != false ] && [ $TASK_DEFINITION != false ]; then
+    if [ "$SERVICE" != false ] && [ "$TASK_DEFINITION" != false ]; then
         echo "Only one of SERVICE or TASK DEFINITION may be specified, but you supplied both"
         exit 6
     fi
-    if [ $SERVICE != false ] && [ $CLUSTER == false ]; then
+    if [ "$SERVICE" != false ] && [ "$CLUSTER" == false ]; then
         echo "CLUSTER is required. You can pass the value using -c or --cluster"
         exit 7
     fi
-    if [ $IMAGE == false ] && [ $FORCE_NEW_DEPLOYMENT == false ]; then
+    if [ "$IMAGE" == false ] && [ "$FORCE_NEW_DEPLOYMENT" == false ]; then
         echo "IMAGE is required. You can pass the value using -i or --image"
         exit 8
     fi
-    if ! [[ $MAX_DEFINITIONS =~ ^-?[0-9]+$ ]]; then
+    if ! [[ "$MAX_DEFINITIONS" =~ ^-?[0-9]+$ ]]; then
         echo "MAX_DEFINITIONS must be numeric, or not defined."
         exit 9
     fi
 
-    if [ $RUN_TASK == false ] && [ $RUN_TASK_LAUNCH_TYPE != false ]; then
+    if [ "$RUN_TASK" == false ] && [ "$RUN_TASK_LAUNCH_TYPE" != false ]; then
         echo 'LAUNCH TYPE requires setting RUN TASK argument. You can set it using --run-task flag.'
         exit 10
     fi
 
-    if [ $RUN_TASK == false ] && [ $RUN_TASK_NETWORK_CONFIGURATION != false ]; then
+    if [ "$RUN_TASK" == false ] && [ "$RUN_TASK_NETWORK_CONFIGURATION" != false ]; then
         echo 'NETWORK CONFIGURATION requires setting RUN TASK argument. You can set it using --run-task flag.'
         exit 11
     fi
 
-    if [ $RUN_TASK == false ] && [ $RUN_TASK_WAIT_FOR_SUCCESS != false ]; then
+    if [ "$RUN_TASK" == false ] && [ "$RUN_TASK_WAIT_FOR_SUCCESS" != false ]; then
         echo 'WAIT FOR SUCCESS requires setting RUN TASK argument. You can set it using --run-task flag.'
         exit 11
     fi
 
-    if [ $RUN_TASK == false ] && [ $RUN_TASK_PLATFORM_VERSION != false ]; then
+    if [ "$RUN_TASK" == false ] && [ "$RUN_TASK_PLATFORM_VERSION" != false ]; then
         echo 'PLATFORM VERSION requires setting RUN TASK argument. You can set it using --run-task flag.'
         exit 12
     fi
@@ -213,39 +217,39 @@ function parseImageName() {
     # - tagOrDigest
     # - emptyOrSha
     # If a group is missing it will be an empty string
-    if [[ "x$TAGONLY" == "x" ]]; then
+    if [[ -z "$TAGONLY" ]]; then
       imageRegex="^([a-zA-Z0-9\.\-]+):?([0-9]+)?/([a-zA-Z0-9\._\-]+)(/[\/a-zA-Z0-9\._\-]+)?:?((@sha256:)?[a-zA-Z0-9\._\-]+)?$"
     else
       imageRegex="^:?([a-zA-Z0-9\._-]+)?$"
     fi
 
-    if [[ $IMAGE =~ $imageRegex ]]; then
+    if [[ "$IMAGE" =~ $imageRegex ]]; then
       # Define variables from matching groups
-      if [[ "x$TAGONLY" == "x" ]]; then
+      if [[ -z "$TAGONLY" ]]; then
         domain=${BASH_REMATCH[1]}
         port=${BASH_REMATCH[2]}
         repo=${BASH_REMATCH[3]}
         img=${BASH_REMATCH[4]/#\//}
         tagOrDigest=${BASH_REMATCH[5]}
         emptyOrSha=${BASH_REMATCH[6]}
-        if [[ "x$emptyOrSha" == "x" ]]; then
+        if [[ -z "$emptyOrSha" ]]; then
           tag=${tagOrDigest}
         else
           digest=${tagOrDigest}
         fi
 
         # Validate what we received to make sure we have the pieces needed
-        if [[ "x$domain" == "x" ]]; then
+        if [[ -z "$domain" ]]; then
           echo "Image name does not contain a domain or repo as expected. See usage for supported formats."
           exit 10;
         fi
-        if [[ "x$repo" == "x" ]]; then
+        if [[ -z "$repo" ]]; then
           echo "Image name is missing the actual image name. See usage for supported formats."
           exit 11;
         fi
 
         # When a match for image is not found, the image name was picked up by the repo group, so reset variables
-        if [[ "x$img" == "x" ]]; then
+        if [[ -z "$img" ]]; then
          img=$repo
          repo=""
         fi
@@ -259,15 +263,15 @@ function parseImageName() {
     else
       # check if using root level repo with format like mariadb or mariadb:latest
       rootRepoRegex="^([a-zA-Z0-9\-]+):?((@sha256:)?[a-zA-Z0-9\.\-_]+)?$"
-      if [[ $IMAGE =~ $rootRepoRegex ]]; then
+      if [[ "$IMAGE" =~ $rootRepoRegex ]]; then
         img=${BASH_REMATCH[1]}
-        if [[ "x$img" == "x" ]]; then
+        if [[ -z "$img" ]]; then
           echo "Invalid image name. See usage for supported formats."
           exit 12
         fi
         tagOrDigest=${BASH_REMATCH[2]}
         emptyOrSha=${BASH_REMATCH[3]}
-        if [[ "x$emptyOrSha" == "x" ]]; then
+        if [[ -z "$emptyOrSha" ]]; then
           tag=${tagOrDigest}
         else
           digest=${tagOrDigest}
@@ -285,12 +289,12 @@ function parseImageName() {
     fi
 
     # If tag is missing make sure we can get it from env var, or use latest as default
-    if [[ "x$tag" == "x" ]]; then
+    if [[ -z "$tag" ]]; then
       if [[ $TAGVAR == false ]]; then
         tag="latest"
       else
         tag=${!TAGVAR}
-        if [[ "x$tag" == "x" ]]; then
+        if [[ -z "$tag" ]]; then
           tag="latest"
         else
           # If !TAGVAR isn't empty, we should use the value of the env var as the tag whether IMAGE contains a digest or not.
@@ -301,7 +305,7 @@ function parseImageName() {
 
     # Reassemble image name
     useImage=""
-    if [[ "x$TAGONLY" == "x" ]]; then
+    if [[ -z "$TAGONLY" ]]; then
 
       if [[ ! -z "$domain" ]]; then
         useImage="$domain"
@@ -332,52 +336,52 @@ function parseImageName() {
 
     # If in test mode output $useImage
     if [ "$BASH_SOURCE" != "$0" ]; then
-      echo $useImage
+      echo "$useImage"
     fi
 }
 
 function getCurrentTaskDefinition() {
-    if [ $SERVICE != false ]; then
+    if [ "$SERVICE" != false ]; then
       # Get current task definition arn from service
-      TASK_DEFINITION_ARN=`$AWS_ECS describe-services --services $SERVICE --cluster $CLUSTER | jq -r .services[0].taskDefinition`
-      TASK_DEFINITION=`$AWS_ECS describe-task-definition --task-def $TASK_DEFINITION_ARN`
+      TASK_DEFINITION_ARN=$($AWS_ECS describe-services --services "$SERVICE" --cluster "$CLUSTER" | jq -r .services[0].taskDefinition)
+      TASK_DEFINITION=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_ARN")
 
       # For rollbacks
-      LAST_USED_TASK_DEFINITION_ARN=$TASK_DEFINITION_ARN
+      LAST_USED_TASK_DEFINITION_ARN="$TASK_DEFINITION_ARN"
 
-      if [ $USE_MOST_RECENT_TASK_DEFINITION != false ]; then
+      if [ "$USE_MOST_RECENT_TASK_DEFINITION" != false ]; then
         # Use the most recently created TD of the family; rather than the most recently used.
-        TASK_DEFINITION_FAMILY=`$AWS_ECS describe-task-definition --task-def $TASK_DEFINITION_ARN | jq -r .taskDefinition.family`
-        TASK_DEFINITION=`$AWS_ECS describe-task-definition --task-def $TASK_DEFINITION_FAMILY`
-        TASK_DEFINITION_ARN=`$AWS_ECS describe-task-definition --task-def $TASK_DEFINITION_FAMILY | jq -r .taskDefinition.taskDefinitionArn`
+        TASK_DEFINITION_FAMILY=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_ARN" | jq -r .taskDefinition.family)
+        TASK_DEFINITION=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_FAMILY")
+        TASK_DEFINITION_ARN=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_FAMILY" | jq -r .taskDefinition.taskDefinitionArn)
       fi
-    elif [ $TASK_DEFINITION != false ]; then
+    elif [ "$TASK_DEFINITION" != false ]; then
       # Get current task definition arn from family[:revision] (or arn)
-      TASK_DEFINITION_ARN=`$AWS_ECS describe-task-definition --task-def $TASK_DEFINITION | jq -r .taskDefinition.taskDefinitionArn`
+      TASK_DEFINITION_ARN=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION" | jq -r .taskDefinition.taskDefinitionArn)
     fi
 
     # Get task definition using current task definition arn
     # If we're copying task definition tags to the new revision, also get current task definition tags
     if [[ "$COPY_TASK_DEFINITION_TAGS" == true ]]; then
-      TASK_DEFINITION=`$AWS_ECS describe-task-definition --task-def $TASK_DEFINITION_ARN --include TAGS`
+      TASK_DEFINITION=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_ARN" --include TAGS)
       TASK_DEFINITION_TAGS=$( echo "$TASK_DEFINITION" | jq ".tags" )
     else
-      TASK_DEFINITION=`$AWS_ECS describe-task-definition --task-def $TASK_DEFINITION_ARN`
+      TASK_DEFINITION=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_ARN")
     fi
 }
 
 function createNewTaskDefJson() {
 
-    if [ $TASK_DEFINITION_FILE == false ]; then
+    if [ "$TASK_DEFINITION_FILE" == false ]; then
         taskDefinition="$TASK_DEFINITION"
     else
-        taskDefinition="$(cat $TASK_DEFINITION_FILE)"
+        taskDefinition="$(cat "$TASK_DEFINITION_FILE")"
     fi
 
     # Get a JSON representation of the current task definition
     # + Update definition to use new image name
     # + Filter the def
-    if [[ "x$TAGONLY" == "x" ]]; then
+    if [[ -z "$TAGONLY" ]]; then
       DEF=$( echo "$taskDefinition" \
             | sed -e 's~"image":.*'"${imageWithoutTag}:"'.*,~"image": "'"${useImage}"'",~g' \
             | jq '.taskDefinition' )
@@ -401,10 +405,10 @@ function createNewTaskDefJson() {
 
     # Updated jq filters for AWS Fargate
     REQUIRES_COMPATIBILITIES=$(echo "${DEF}" | jq -r '. | select(.requiresCompatibilities != null) | .requiresCompatibilities[]')
-    if `echo ${REQUIRES_COMPATIBILITIES[@]} | grep -q "FARGATE"`; then
+    if echo "$REQUIRES_COMPATIBILITIES" | grep -q "FARGATE"; then
       FARGATE_JQ_FILTER='requiresCompatibilities: .requiresCompatibilities'
 
-      if [[ ! "$NEW_DEF_JQ_FILTER" =~ ".*executionRoleArn.*" ]]; then
+      if [[ ! "$NEW_DEF_JQ_FILTER" =~ .*executionRoleArn.* ]]; then
         FARGATE_JQ_FILTER="${FARGATE_JQ_FILTER}, executionRoleArn: .executionRoleArn"
       fi
       NEW_DEF_JQ_FILTER="${NEW_DEF_JQ_FILTER}, ${FARGATE_JQ_FILTER}"
@@ -422,24 +426,24 @@ function createNewTaskDefJson() {
 function registerNewTaskDefinition() {
     # Register the new task definition, and store its ARN
     if [[ "$COPY_TASK_DEFINITION_TAGS" == true && "$TASK_DEFINITION_TAGS" != false && "$TASK_DEFINITION_TAGS" != "[]" ]]; then
-      NEW_TASKDEF=`$AWS_ECS register-task-definition --cli-input-json "$NEW_DEF" --tags "$TASK_DEFINITION_TAGS" | jq -r .taskDefinition.taskDefinitionArn`
+      NEW_TASKDEF=$($AWS_ECS register-task-definition --cli-input-json "$NEW_DEF" --tags "$TASK_DEFINITION_TAGS" | jq -r .taskDefinition.taskDefinitionArn)
     else
-      NEW_TASKDEF=`$AWS_ECS register-task-definition --cli-input-json "$NEW_DEF" | jq -r .taskDefinition.taskDefinitionArn`
+      NEW_TASKDEF=$($AWS_ECS register-task-definition --cli-input-json "$NEW_DEF" | jq -r .taskDefinition.taskDefinitionArn)
     fi
 }
 
 function rollback() {
     echo "Rolling back to ${LAST_USED_TASK_DEFINITION_ARN}"
-    $AWS_ECS update-service --cluster $CLUSTER --service $SERVICE --task-definition $LAST_USED_TASK_DEFINITION_ARN > /dev/null
+    $AWS_ECS update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$LAST_USED_TASK_DEFINITION_ARN" > /dev/null
 }
 
 function updateServiceForceNewDeployment() {
     echo 'Force a new deployment of the service'
-    $AWS_ECS update-service --cluster $CLUSTER --service $SERVICE --force-new-deployment > /dev/null
+    $AWS_ECS update-service --cluster "$CLUSTER" --service "$SERVICE" --force-new-deployment > /dev/null
 }
 
 function updateService() {
-    if [[ $(echo ${NEW_DEF} | jq ".containerDefinitions[0].healthCheck != null") == true ]]; then
+    if [[ $(echo "${NEW_DEF}" | jq ".containerDefinitions[0].healthCheck != null") == true ]]; then
         checkFieldName="healthStatus"
         checkFieldValue='"HEALTHY"'
     else
@@ -449,10 +453,10 @@ function updateService() {
 
     UPDATE_SERVICE_SUCCESS="false"
     DEPLOYMENT_CONFIG=""
-    if [ $MAX != false ]; then
+    if [ "$MAX" != false ]; then
         DEPLOYMENT_CONFIG=",maximumPercent=$MAX"
     fi
-    if [ $MIN != false ]; then
+    if [ "$MIN" != false ]; then
         DEPLOYMENT_CONFIG="$DEPLOYMENT_CONFIG,minimumHealthyPercent=$MIN"
     fi
     if [ ! -z "$DEPLOYMENT_CONFIG" ]; then
@@ -465,15 +469,15 @@ function updateService() {
     fi
 
     # Update the service
-    UPDATE=`$AWS_ECS update-service --cluster $CLUSTER --service $SERVICE $DESIRED_COUNT --task-definition $NEW_TASKDEF $DEPLOYMENT_CONFIG`
+    UPDATE=$($AWS_ECS update-service --cluster "$CLUSTER" --service "$SERVICE" $DESIRED_COUNT --task-definition "$NEW_TASKDEF" $DEPLOYMENT_CONFIG)
 
     # Only excepts RUNNING state from services whose desired-count > 0
-    SERVICE_DESIREDCOUNT=`$AWS_ECS describe-services --cluster $CLUSTER --service $SERVICE | jq '.services[]|.desiredCount'`
-    if [ $SERVICE_DESIREDCOUNT -gt 0 ]; then
+    SERVICE_DESIREDCOUNT=$($AWS_ECS describe-services --cluster "$CLUSTER" --service "$SERVICE" | jq '.services[]|.desiredCount')
+    if [ "$SERVICE_DESIREDCOUNT" -gt 0 ]; then
         # See if the service is able to come up again
         every=10
         i=0
-        while [ $i -lt $TIMEOUT ]
+        while [ "$i" -lt "$TIMEOUT" ]
         do
             # Scan the list of running tasks for that service, and see if one of them is the
             # new version of the task definition
@@ -481,22 +485,22 @@ function updateService() {
             RUNNING_TASKS=$($AWS_ECS list-tasks --cluster "$CLUSTER"  --service-name "$SERVICE" --desired-status RUNNING \
                 | jq -r '.taskArns[]')
 
-            if [[ ! -z $RUNNING_TASKS ]] ; then
-                RUNNING=$($AWS_ECS describe-tasks --cluster "$CLUSTER" --tasks $RUNNING_TASKS \
+            if [[ ! -z "$RUNNING_TASKS" ]] ; then
+                RUNNING=$($AWS_ECS describe-tasks --cluster "$CLUSTER" --tasks "$RUNNING_TASKS" \
                     | jq ".tasks[]| if .taskDefinitionArn == \"$NEW_TASKDEF\" then . else empty end|.${checkFieldName}" \
                     | grep -e "${checkFieldValue}") || :
 
                 if [ "$RUNNING" ]; then
                     echo "Service updated successfully, new task definition running.";
 
-                    if [[ $MAX_DEFINITIONS -gt 0 ]]; then
+                    if [[ "$MAX_DEFINITIONS" -gt 0 ]]; then
                         FAMILY_PREFIX=${TASK_DEFINITION_ARN##*:task-definition/}
                         FAMILY_PREFIX=${FAMILY_PREFIX%*:[0-9]*}
-                        TASK_REVISIONS=`$AWS_ECS list-task-definitions --family-prefix $FAMILY_PREFIX --status ACTIVE --sort ASC`
+                        TASK_REVISIONS=$($AWS_ECS list-task-definitions --family-prefix "$FAMILY_PREFIX" --status ACTIVE --sort ASC)
                         NUM_ACTIVE_REVISIONS=$(echo "$TASK_REVISIONS" | jq ".taskDefinitionArns|length")
-                        if [[ $NUM_ACTIVE_REVISIONS -gt $MAX_DEFINITIONS ]]; then
-                            LAST_OUTDATED_INDEX=$(($NUM_ACTIVE_REVISIONS - $MAX_DEFINITIONS - 1))
-                            for i in $(seq 0 $LAST_OUTDATED_INDEX); do
+                        if [[ "$NUM_ACTIVE_REVISIONS" -gt "$MAX_DEFINITIONS" ]]; then
+                            LAST_OUTDATED_INDEX=$((NUM_ACTIVE_REVISIONS - MAX_DEFINITIONS - 1))
+                            for i in $(seq 0 "$LAST_OUTDATED_INDEX"); do
                                 OUTDATED_REVISION_ARN=$(echo "$TASK_REVISIONS" | jq -r ".taskDefinitionArns[$i]")
 
                                 echo "Deregistering outdated task revision: $OUTDATED_REVISION_ARN"
@@ -511,8 +515,8 @@ function updateService() {
                 fi
             fi
 
-            sleep $every
-            i=$(( $i + $every ))
+            sleep "$every"
+            i=$(( "$i" + "$every" ))
         done
 
         if [[ "${UPDATE_SERVICE_SUCCESS}" != "true" ]]; then
@@ -533,20 +537,20 @@ function waitForGreenDeployment {
   every=2
   i=0
   echo "Waiting for service deployment to complete..."
-  while [ $i -lt $TIMEOUT ]
+  while [ "$i" -lt "$TIMEOUT" ]
   do
-    NUM_DEPLOYMENTS=$($AWS_ECS describe-services --services $SERVICE --cluster $CLUSTER | jq "[.services[].deployments[]] | length")
+    NUM_DEPLOYMENTS=$($AWS_ECS describe-services --services "$SERVICE" --cluster "$CLUSTER" | jq "[.services[].deployments[]] | length")
 
     # Wait until 1 deployment stays running
     # If the wait time has passed, we need to roll back
-    if [ $NUM_DEPLOYMENTS -eq 1 ]; then
+    if [ "$NUM_DEPLOYMENTS" -eq 1 ]; then
       echo "Service deployment successful."
       DEPLOYMENT_SUCCESS="true"
       # Exit the loop.
-      i=$TIMEOUT
+      i="$TIMEOUT"
     else
-      sleep $every
-      i=$(( $i + $every ))
+      sleep "$every"
+      i=$(( "$i" + "$every" ))
     fi
   done
 
@@ -561,36 +565,36 @@ function waitForGreenDeployment {
 function runTask {
   echo "Run task: $NEW_TASKDEF";
   AWS_ECS_RUN_TASK="$AWS_ECS run-task --cluster $CLUSTER --task-definition $NEW_TASKDEF"
-  if [ $RUN_TASK_LAUNCH_TYPE != false ]; then
+  if [ "$RUN_TASK_LAUNCH_TYPE" != false ]; then
     AWS_ECS_RUN_TASK="$AWS_ECS_RUN_TASK --launch-type $RUN_TASK_LAUNCH_TYPE"
   fi
 
-  if [ $RUN_TASK_PLATFORM_VERSION != false ]; then
+  if [ "$RUN_TASK_PLATFORM_VERSION" != false ]; then
     AWS_ECS_RUN_TASK="$AWS_ECS_RUN_TASK --platform-version $RUN_TASK_PLATFORM_VERSION"
   fi
 
-  if [ $RUN_TASK_NETWORK_CONFIGURATION != false ]; then
+  if [ "$RUN_TASK_NETWORK_CONFIGURATION" != false ]; then
     AWS_ECS_RUN_TASK="$AWS_ECS_RUN_TASK --network-configuration \"$RUN_TASK_NETWORK_CONFIGURATION\""
   fi
 
-  TASK_ARN=$(eval $AWS_ECS_RUN_TASK | jq -r '.tasks[0].taskArn')
+  TASK_ARN=$(eval "$AWS_ECS_RUN_TASK" | jq -r '.tasks[0].taskArn')
   echo "Executed task: $TASK_ARN"
 
-  if [ $RUN_TASK_WAIT_FOR_SUCCESS == true ]; then
+  if [ "$RUN_TASK_WAIT_FOR_SUCCESS" == true ]; then
     RUN_TASK_SUCCESS=false
     every=10
     i=0
-    while [ $i -lt $TIMEOUT ]
+    while [ "$i" -lt "$TIMEOUT" ]
     do
 
         TASK_JSON=$($AWS_ECS describe-tasks --cluster "$CLUSTER"  --tasks "$TASK_ARN")
 
-        TASK_STATUS=$(echo $TASK_JSON | jq -r  '.tasks[0].lastStatus')
-        TASK_EXIT_CODE=$(echo $TASK_JSON | jq -r  '.tasks[0].containers[0].exitCode')
+        TASK_STATUS=$(echo "$TASK_JSON" | jq -r  '.tasks[0].lastStatus')
+        TASK_EXIT_CODE=$(echo "$TASK_JSON" | jq -r  '.tasks[0].containers[0].exitCode')
 
-        if [ $TASK_STATUS == "STOPPED" ]; then
+        if [ "$TASK_STATUS" == "STOPPED" ]; then
             echo "Task finished with status: $TASK_STATUS"
-            if [ $TASK_EXIT_CODE != 0 ]; then
+            if [ "$TASK_EXIT_CODE" != 0 ]; then
                 echo "Task execution failed with exit code: $TASK_EXIT_CODE"
                 exit 1
             fi
@@ -600,11 +604,11 @@ function runTask {
 
         echo "Checking task status every $every seconds. Status: $TASK_STATUS"
 
-        sleep $every
-        i=$(( $i + $every ))
+        sleep "$every"
+        i=$(( "$i" + "$every" ))
     done
 
-    if [ $RUN_TASK_SUCCESS == false ]; then
+    if [ "$RUN_TASK_SUCCESS" == false ]; then
       echo "ERROR: New task run took longer than $TIMEOUT seconds"
       exit 1
     fi
@@ -748,7 +752,7 @@ if [ "$BASH_SOURCE" == "$0" ]; then
                 VERBOSE=true
                 ;;
             --version)
-                echo ${VERSION}
+                echo "${VERSION}"
                 exit 0
                 ;;
             *)
@@ -762,7 +766,7 @@ if [ "$BASH_SOURCE" == "$0" ]; then
         shift # past argument or value
     done
 
-    if [ $VERBOSE == true ]; then
+    if [ "$VERBOSE" == true ]; then
         set -x
     fi
 
@@ -774,9 +778,9 @@ if [ "$BASH_SOURCE" == "$0" ]; then
     fi
 
     # Not required creation of new a task definition
-    if [ $FORCE_NEW_DEPLOYMENT == true ]; then
+    if [ "$FORCE_NEW_DEPLOYMENT" == true ]; then
         updateServiceForceNewDeployment
-        if [[ $SKIP_DEPLOYMENTS_CHECK != true ]]; then
+        if [[ "$SKIP_DEPLOYMENTS_CHECK" != true ]]; then
           waitForGreenDeployment
         fi
         exit 0
@@ -798,15 +802,15 @@ if [ "$BASH_SOURCE" == "$0" ]; then
     echo "New task definition: $NEW_TASKDEF";
 
     # update service if needed
-    if [ $SERVICE == false ]; then
-        if [ $RUN_TASK == true ]; then
+    if [ "$SERVICE" == false ]; then
+        if [ "$RUN_TASK" == true ]; then
             runTask
         fi
         echo "Task definition updated successfully"
     else
         updateService
 
-        if [[ $SKIP_DEPLOYMENTS_CHECK != true ]]; then
+        if [[ "$SKIP_DEPLOYMENTS_CHECK" != true ]]; then
           waitForGreenDeployment
         fi
     fi
