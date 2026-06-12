@@ -343,30 +343,30 @@ function parseImageName() {
 function getCurrentTaskDefinition() {
     if [ "$SERVICE" != false ]; then
       # Get current task definition arn from service
-      TASK_DEFINITION_ARN=$("$AWS_ECS" describe-services --services "$SERVICE" --cluster "$CLUSTER" | jq -r .services[0].taskDefinition)
-      TASK_DEFINITION=$("$AWS_ECS" describe-task-definition --task-def "$TASK_DEFINITION_ARN")
+      TASK_DEFINITION_ARN=$($AWS_ECS describe-services --services "$SERVICE" --cluster "$CLUSTER" | jq -r .services[0].taskDefinition)
+      TASK_DEFINITION=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_ARN")
 
       # For rollbacks
       LAST_USED_TASK_DEFINITION_ARN="$TASK_DEFINITION_ARN"
 
       if [ "$USE_MOST_RECENT_TASK_DEFINITION" != false ]; then
         # Use the most recently created TD of the family; rather than the most recently used.
-        TASK_DEFINITION_FAMILY=$("$AWS_ECS" describe-task-definition --task-def "$TASK_DEFINITION_ARN" | jq -r .taskDefinition.family)
-        TASK_DEFINITION=$("$AWS_ECS" describe-task-definition --task-def "$TASK_DEFINITION_FAMILY")
-        TASK_DEFINITION_ARN=$("$AWS_ECS" describe-task-definition --task-def "$TASK_DEFINITION_FAMILY" | jq -r .taskDefinition.taskDefinitionArn)
+        TASK_DEFINITION_FAMILY=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_ARN" | jq -r .taskDefinition.family)
+        TASK_DEFINITION=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_FAMILY")
+        TASK_DEFINITION_ARN=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_FAMILY" | jq -r .taskDefinition.taskDefinitionArn)
       fi
     elif [ "$TASK_DEFINITION" != false ]; then
       # Get current task definition arn from family[:revision] (or arn)
-      TASK_DEFINITION_ARN=$("$AWS_ECS" describe-task-definition --task-def "$TASK_DEFINITION" | jq -r .taskDefinition.taskDefinitionArn)
+      TASK_DEFINITION_ARN=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION" | jq -r .taskDefinition.taskDefinitionArn)
     fi
 
     # Get task definition using current task definition arn
     # If we're copying task definition tags to the new revision, also get current task definition tags
     if [[ "$COPY_TASK_DEFINITION_TAGS" == true ]]; then
-      TASK_DEFINITION=$("$AWS_ECS" describe-task-definition --task-def "$TASK_DEFINITION_ARN" --include TAGS)
+      TASK_DEFINITION=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_ARN" --include TAGS)
       TASK_DEFINITION_TAGS=$( echo "$TASK_DEFINITION" | jq ".tags" )
     else
-      TASK_DEFINITION=$("$AWS_ECS" describe-task-definition --task-def "$TASK_DEFINITION_ARN")
+      TASK_DEFINITION=$($AWS_ECS describe-task-definition --task-def "$TASK_DEFINITION_ARN")
     fi
 }
 
@@ -405,7 +405,7 @@ function createNewTaskDefJson() {
 
     # Updated jq filters for AWS Fargate
     REQUIRES_COMPATIBILITIES=$(echo "${DEF}" | jq -r '. | select(.requiresCompatibilities != null) | .requiresCompatibilities[]')
-    if echo "${REQUIRES_COMPATIBILITIES[@]}" | grep -q "FARGATE"; then
+    if echo "$REQUIRES_COMPATIBILITIES" | grep -q "FARGATE"; then
       FARGATE_JQ_FILTER='requiresCompatibilities: .requiresCompatibilities'
 
       if [[ ! "$NEW_DEF_JQ_FILTER" =~ .*executionRoleArn.* ]]; then
@@ -426,20 +426,20 @@ function createNewTaskDefJson() {
 function registerNewTaskDefinition() {
     # Register the new task definition, and store its ARN
     if [[ "$COPY_TASK_DEFINITION_TAGS" == true && "$TASK_DEFINITION_TAGS" != false && "$TASK_DEFINITION_TAGS" != "[]" ]]; then
-      NEW_TASKDEF=$("$AWS_ECS" register-task-definition --cli-input-json "$NEW_DEF" --tags "$TASK_DEFINITION_TAGS" | jq -r .taskDefinition.taskDefinitionArn)
+      NEW_TASKDEF=$($AWS_ECS register-task-definition --cli-input-json "$NEW_DEF" --tags "$TASK_DEFINITION_TAGS" | jq -r .taskDefinition.taskDefinitionArn)
     else
-      NEW_TASKDEF=$("$AWS_ECS" register-task-definition --cli-input-json "$NEW_DEF" | jq -r .taskDefinition.taskDefinitionArn)
+      NEW_TASKDEF=$($AWS_ECS register-task-definition --cli-input-json "$NEW_DEF" | jq -r .taskDefinition.taskDefinitionArn)
     fi
 }
 
 function rollback() {
     echo "Rolling back to ${LAST_USED_TASK_DEFINITION_ARN}"
-    "$AWS_ECS" update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$LAST_USED_TASK_DEFINITION_ARN" > /dev/null
+    $AWS_ECS update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$LAST_USED_TASK_DEFINITION_ARN" > /dev/null
 }
 
 function updateServiceForceNewDeployment() {
     echo 'Force a new deployment of the service'
-    "$AWS_ECS" update-service --cluster "$CLUSTER" --service "$SERVICE" --force-new-deployment > /dev/null
+    $AWS_ECS update-service --cluster "$CLUSTER" --service "$SERVICE" --force-new-deployment > /dev/null
 }
 
 function updateService() {
@@ -469,10 +469,10 @@ function updateService() {
     fi
 
     # Update the service
-    UPDATE=$("$AWS_ECS" update-service --cluster "$CLUSTER" --service "$SERVICE" "$DESIRED_COUNT" --task-definition "$NEW_TASKDEF" "$DEPLOYMENT_CONFIG")
+    UPDATE=$($AWS_ECS update-service --cluster "$CLUSTER" --service "$SERVICE" $DESIRED_COUNT --task-definition "$NEW_TASKDEF" $DEPLOYMENT_CONFIG)
 
     # Only excepts RUNNING state from services whose desired-count > 0
-    SERVICE_DESIREDCOUNT=$("$AWS_ECS" describe-services --cluster "$CLUSTER" --service "$SERVICE" | jq '.services[]|.desiredCount')
+    SERVICE_DESIREDCOUNT=$($AWS_ECS describe-services --cluster "$CLUSTER" --service "$SERVICE" | jq '.services[]|.desiredCount')
     if [ "$SERVICE_DESIREDCOUNT" -gt 0 ]; then
         # See if the service is able to come up again
         every=10
@@ -482,11 +482,11 @@ function updateService() {
             # Scan the list of running tasks for that service, and see if one of them is the
             # new version of the task definition
 
-            RUNNING_TASKS=$("$AWS_ECS" list-tasks --cluster "$CLUSTER"  --service-name "$SERVICE" --desired-status RUNNING \
+            RUNNING_TASKS=$($AWS_ECS list-tasks --cluster "$CLUSTER"  --service-name "$SERVICE" --desired-status RUNNING \
                 | jq -r '.taskArns[]')
 
             if [[ ! -z "$RUNNING_TASKS" ]] ; then
-                RUNNING=$("$AWS_ECS" describe-tasks --cluster "$CLUSTER" --tasks "$RUNNING_TASKS" \
+                RUNNING=$($AWS_ECS describe-tasks --cluster "$CLUSTER" --tasks "$RUNNING_TASKS" \
                     | jq ".tasks[]| if .taskDefinitionArn == \"$NEW_TASKDEF\" then . else empty end|.${checkFieldName}" \
                     | grep -e "${checkFieldValue}") || :
 
@@ -496,7 +496,7 @@ function updateService() {
                     if [[ "$MAX_DEFINITIONS" -gt 0 ]]; then
                         FAMILY_PREFIX=${TASK_DEFINITION_ARN##*:task-definition/}
                         FAMILY_PREFIX=${FAMILY_PREFIX%*:[0-9]*}
-                        TASK_REVISIONS=$("$AWS_ECS" list-task-definitions --family-prefix "$FAMILY_PREFIX" --status ACTIVE --sort ASC)
+                        TASK_REVISIONS=$($AWS_ECS list-task-definitions --family-prefix "$FAMILY_PREFIX" --status ACTIVE --sort ASC)
                         NUM_ACTIVE_REVISIONS=$(echo "$TASK_REVISIONS" | jq ".taskDefinitionArns|length")
                         if [[ "$NUM_ACTIVE_REVISIONS" -gt "$MAX_DEFINITIONS" ]]; then
                             LAST_OUTDATED_INDEX=$((NUM_ACTIVE_REVISIONS - MAX_DEFINITIONS - 1))
@@ -505,7 +505,7 @@ function updateService() {
 
                                 echo "Deregistering outdated task revision: $OUTDATED_REVISION_ARN"
 
-                              "$AWS_ECS" deregister-task-definition --task-definition "$OUTDATED_REVISION_ARN" > /dev/null
+                              $AWS_ECS deregister-task-definition --task-definition "$OUTDATED_REVISION_ARN" > /dev/null
                             done
                         fi
 
@@ -539,7 +539,7 @@ function waitForGreenDeployment {
   echo "Waiting for service deployment to complete..."
   while [ "$i" -lt "$TIMEOUT" ]
   do
-    NUM_DEPLOYMENTS=$("$AWS_ECS" describe-services --services "$SERVICE" --cluster "$CLUSTER" | jq "[.services[].deployments[]] | length")
+    NUM_DEPLOYMENTS=$($AWS_ECS describe-services --services "$SERVICE" --cluster "$CLUSTER" | jq "[.services[].deployments[]] | length")
 
     # Wait until 1 deployment stays running
     # If the wait time has passed, we need to roll back
@@ -587,7 +587,7 @@ function runTask {
     while [ "$i" -lt "$TIMEOUT" ]
     do
 
-        TASK_JSON=$("$AWS_ECS" describe-tasks --cluster "$CLUSTER"  --tasks "$TASK_ARN")
+        TASK_JSON=$($AWS_ECS describe-tasks --cluster "$CLUSTER"  --tasks "$TASK_ARN")
 
         TASK_STATUS=$(echo "$TASK_JSON" | jq -r  '.tasks[0].lastStatus')
         TASK_EXIT_CODE=$(echo "$TASK_JSON" | jq -r  '.tasks[0].containers[0].exitCode')
