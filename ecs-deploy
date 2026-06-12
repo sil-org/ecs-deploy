@@ -129,12 +129,12 @@ function assumeRole() {
                     --role-arn "${AWS_ASSUME_ROLE}" \
                     --role-session-name "$(date +"%s")")
 
-AWS_ACCESS_KEY_ID=$(echo "$temp_role" | jq .Credentials.AccessKeyId | xargs)
-export AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY=$(echo "$temp_role" | jq .Credentials.SecretAccessKey | xargs)
-export AWS_SECRET_ACCESS_KEY
-AWS_SESSION_TOKEN=$(echo "$temp_role" | jq .Credentials.SessionToken | xargs)
-export AWS_SESSION_TOKEN
+   AWS_ACCESS_KEY_ID=$(echo "$temp_role" | jq .Credentials.AccessKeyId | xargs)
+   export AWS_ACCESS_KEY_ID
+   AWS_SECRET_ACCESS_KEY=$(echo "$temp_role" | jq .Credentials.SecretAccessKey | xargs)
+   export AWS_SECRET_ACCESS_KEY
+   AWS_SESSION_TOKEN=$(echo "$temp_role" | jq .Credentials.SessionToken | xargs)
+   export AWS_SESSION_TOKEN
 
 }
 
@@ -217,7 +217,7 @@ function parseImageName() {
     # - tagOrDigest
     # - emptyOrSha
     # If a group is missing it will be an empty string
-    if [[ "$TAGONLY" == "" ]]; then
+    if [[ -z "$TAGONLY" ]]; then
       imageRegex="^([a-zA-Z0-9\.\-]+):?([0-9]+)?/([a-zA-Z0-9\._\-]+)(/[\/a-zA-Z0-9\._\-]+)?:?((@sha256:)?[a-zA-Z0-9\._\-]+)?$"
     else
       imageRegex="^:?([a-zA-Z0-9\._-]+)?$"
@@ -225,31 +225,31 @@ function parseImageName() {
 
     if [[ "$IMAGE" =~ $imageRegex ]]; then
       # Define variables from matching groups
-      if [[ "$TAGONLY" == "" ]]; then
+      if [[ -z "$TAGONLY" ]]; then
         domain=${BASH_REMATCH[1]}
         port=${BASH_REMATCH[2]}
         repo=${BASH_REMATCH[3]}
         img=${BASH_REMATCH[4]/#\//}
         tagOrDigest=${BASH_REMATCH[5]}
         emptyOrSha=${BASH_REMATCH[6]}
-        if [[ "$emptyOrSha" == "" ]]; then
+        if [[ -z "$emptyOrSha" ]]; then
           tag=${tagOrDigest}
         else
           digest=${tagOrDigest}
         fi
 
         # Validate what we received to make sure we have the pieces needed
-        if [[ "$domain" == "" ]]; then
+        if [[ -z "$domain" ]]; then
           echo "Image name does not contain a domain or repo as expected. See usage for supported formats."
           exit 10;
         fi
-        if [[ "$repo" == "" ]]; then
+        if [[ -z "$repo" ]]; then
           echo "Image name is missing the actual image name. See usage for supported formats."
           exit 11;
         fi
 
         # When a match for image is not found, the image name was picked up by the repo group, so reset variables
-        if [[ "$img" == "" ]]; then
+        if [[ -z "$img" ]]; then
          img=$repo
          repo=""
         fi
@@ -265,13 +265,13 @@ function parseImageName() {
       rootRepoRegex="^([a-zA-Z0-9\-]+):?((@sha256:)?[a-zA-Z0-9\.\-_]+)?$"
       if [[ "$IMAGE" =~ $rootRepoRegex ]]; then
         img=${BASH_REMATCH[1]}
-        if [[ "$img" == "" ]]; then
+        if [[ -z "$img" ]]; then
           echo "Invalid image name. See usage for supported formats."
           exit 12
         fi
         tagOrDigest=${BASH_REMATCH[2]}
         emptyOrSha=${BASH_REMATCH[3]}
-        if [[ "$emptyOrSha" == "" ]]; then
+        if [[ -z "$emptyOrSha" ]]; then
           tag=${tagOrDigest}
         else
           digest=${tagOrDigest}
@@ -289,12 +289,12 @@ function parseImageName() {
     fi
 
     # If tag is missing make sure we can get it from env var, or use latest as default
-    if [[ "$tag" == "" ]]; then
+    if [[ -z "$tag" ]]; then
       if [[ $TAGVAR == false ]]; then
         tag="latest"
       else
         tag=${!TAGVAR}
-        if [[ "$tag" == "" ]]; then
+        if [[ -z "$tag" ]]; then
           tag="latest"
         else
           # If !TAGVAR isn't empty, we should use the value of the env var as the tag whether IMAGE contains a digest or not.
@@ -305,7 +305,7 @@ function parseImageName() {
 
     # Reassemble image name
     useImage=""
-    if [[ "$TAGONLY" == "" ]]; then
+    if [[ -z "$TAGONLY" ]]; then
 
       if [[ ! -z "$domain" ]]; then
         useImage="$domain"
@@ -381,7 +381,7 @@ function createNewTaskDefJson() {
     # Get a JSON representation of the current task definition
     # + Update definition to use new image name
     # + Filter the def
-    if [[ "$TAGONLY" == "" ]]; then
+    if [[ -z "$TAGONLY" ]]; then
       DEF=$( echo "$taskDefinition" \
             | sed -e 's~"image":.*'"${imageWithoutTag}:"'.*,~"image": "'"${useImage}"'",~g' \
             | jq '.taskDefinition' )
