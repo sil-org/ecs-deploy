@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Setup default values for variables
-VERSION="3.10.24"
+VERSION="3.10.25"
 CLUSTER=false
 SERVICE=false
 TASK_DEFINITION=false
@@ -486,7 +486,7 @@ function updateService() {
                 | jq -r '.taskArns[]')
 
             if [[ ! -z "$RUNNING_TASKS" ]] ; then
-                RUNNING=$($AWS_ECS describe-tasks --cluster "$CLUSTER" --tasks "$RUNNING_TASKS" \
+                RUNNING=$($AWS_ECS describe-tasks --cluster "$CLUSTER" --tasks $RUNNING_TASKS \
                     | jq ".tasks[]| if .taskDefinitionArn == \"$NEW_TASKDEF\" then . else empty end|.${checkFieldName}" \
                     | grep -e "${checkFieldValue}") || :
 
