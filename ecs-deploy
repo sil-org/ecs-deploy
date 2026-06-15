@@ -516,7 +516,7 @@ function updateService() {
             fi
 
             sleep "$every"
-            i=$(( "$i" + "$every" ))
+            i=$(( i + every ))
         done
 
         if [[ "${UPDATE_SERVICE_SUCCESS}" != "true" ]]; then
@@ -550,7 +550,7 @@ function waitForGreenDeployment {
       i="$TIMEOUT"
     else
       sleep "$every"
-      i=$(( "$i" + "$every" ))
+      i=$(( i + every ))
     fi
   done
 
@@ -605,7 +605,7 @@ function runTask {
         echo "Checking task status every $every seconds. Status: $TASK_STATUS"
 
         sleep "$every"
-        i=$(( "$i" + "$every" ))
+        i=$(( i + every ))
     done
 
     if [ "$RUN_TASK_SUCCESS" == false ]; then
