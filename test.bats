@@ -811,3 +811,23 @@ EOF
   [ ! -z $status ]
   [ "$(echo "$output" | jq .)" == "$(echo "$expected" | jq .)" ]
 }
+
+# getOutdatedTaskDefinitions tests
+# Pure function: given the ACTIVE revisions JSON and a max, returns the ARNs to deregister.
+
+@test "test getOutdatedTaskDefinitions returns oldest revisions beyond max" {
+  revisions='{ "taskDefinitionArns": [ "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:1", "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:2", "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:3", "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:4", "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:5" ] }'
+  run getOutdatedTaskDefinitions "$revisions" 2
+  [ ! -z $status ]
+  [ "${#lines[@]}" -eq 3 ]
+  [ "${lines[0]}" == "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:1" ]
+  [ "${lines[1]}" == "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:2" ]
+  [ "${lines[2]}" == "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:3" ]
+}
+
+@test "test getOutdatedTaskDefinitions returns nothing when within max" {
+  revisions='{ "taskDefinitionArns": [ "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:1", "arn:aws:ecs:us-east-1:123456789012:task-definition/app-task-def:2" ] }'
+  run getOutdatedTaskDefinitions "$revisions" 5
+  [ ! -z $status ]
+  [ -z "$output" ]
+}
