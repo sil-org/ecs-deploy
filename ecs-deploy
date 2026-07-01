@@ -442,6 +442,25 @@ function updateServiceForceNewDeployment() {
     $AWS_ECS update-service --cluster "$CLUSTER" --service "$SERVICE" --force-new-deployment > /dev/null
 }
 
+function deregisterOutdatedTaskDefinitions() {
+    if [[ "$MAX_DEFINITIONS" -gt 0 ]]; then
+        FAMILY_PREFIX=${TASK_DEFINITION_ARN##*:task-definition/}
+        FAMILY_PREFIX=${FAMILY_PREFIX%*:[0-9]*}
+        TASK_REVISIONS=$($AWS_ECS list-task-definitions --family-prefix "$FAMILY_PREFIX" --status ACTIVE --sort ASC)
+        NUM_ACTIVE_REVISIONS=$(echo "$TASK_REVISIONS" | jq ".taskDefinitionArns|length")
+        if [[ "$NUM_ACTIVE_REVISIONS" -gt "$MAX_DEFINITIONS" ]]; then
+            LAST_OUTDATED_INDEX=$((NUM_ACTIVE_REVISIONS - MAX_DEFINITIONS - 1))
+            for i in $(seq 0 "$LAST_OUTDATED_INDEX"); do
+                OUTDATED_REVISION_ARN=$(echo "$TASK_REVISIONS" | jq -r ".taskDefinitionArns[$i]")
+
+                echo "Deregistering outdated task revision: $OUTDATED_REVISION_ARN"
+
+                $AWS_ECS deregister-task-definition --task-definition "$OUTDATED_REVISION_ARN" > /dev/null
+            done
+        fi
+    fi
+}
+
 function updateService() {
     if [[ $(echo "${NEW_DEF}" | jq ".containerDefinitions[0].healthCheck != null") == true ]]; then
         checkFieldName="healthStatus"
@@ -493,23 +512,8 @@ function updateService() {
                 if [ "$RUNNING" ]; then
                     echo "Service updated successfully, new task definition running.";
 
-                    if [[ "$MAX_DEFINITIONS" -gt 0 ]]; then
-                        FAMILY_PREFIX=${TASK_DEFINITION_ARN##*:task-definition/}
-                        FAMILY_PREFIX=${FAMILY_PREFIX%*:[0-9]*}
-                        TASK_REVISIONS=$($AWS_ECS list-task-definitions --family-prefix "$FAMILY_PREFIX" --status ACTIVE --sort ASC)
-                        NUM_ACTIVE_REVISIONS=$(echo "$TASK_REVISIONS" | jq ".taskDefinitionArns|length")
-                        if [[ "$NUM_ACTIVE_REVISIONS" -gt "$MAX_DEFINITIONS" ]]; then
-                            LAST_OUTDATED_INDEX=$((NUM_ACTIVE_REVISIONS - MAX_DEFINITIONS - 1))
-                            for i in $(seq 0 "$LAST_OUTDATED_INDEX"); do
-                                OUTDATED_REVISION_ARN=$(echo "$TASK_REVISIONS" | jq -r ".taskDefinitionArns[$i]")
+                    deregisterOutdatedTaskDefinitions
 
-                                echo "Deregistering outdated task revision: $OUTDATED_REVISION_ARN"
-
-                              $AWS_ECS deregister-task-definition --task-definition "$OUTDATED_REVISION_ARN" > /dev/null
-                            done
-                        fi
-
-                    fi
                     UPDATE_SERVICE_SUCCESS="true"
                     break
                 fi
@@ -803,6 +807,7 @@ if [ "$BASH_SOURCE" == "$0" ]; then
 
     # update service if needed
     if [ "$SERVICE" == false ]; then
+        deregisterOutdatedTaskDefinitions
         if [ "$RUN_TASK" == true ]; then
             runTask
         fi
